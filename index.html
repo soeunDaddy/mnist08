@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 손글씨 인식 스튜디오 | Handwriting AI Studio</title>
+  <meta name="description" content="웹 브라우저에서 손글씨로 쓴 한글, 숫자, 영어를 실시간으로 인식하고 분석하는 스마트 웹 애플리케이션">
+  
+  <!-- Google Fonts: Pretendard & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Pretendard:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="css/style.css">
+
+  <!-- Tesseract.js for Korean & English OCR -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body>
+  <div class="app-background">
+    <div class="glow-orb orb-1"></div>
+    <div class="glow-orb orb-2"></div>
+    <div class="glow-orb orb-3"></div>
+  </div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand-section">
+        <div class="brand-logo">
+          <i class="fa-solid fa-pen-nib"></i>
+        </div>
+        <div class="brand-text">
+          <h1 class="brand-title">AI 손글씨 인식 스튜디오</h1>
+          <p class="brand-subtitle">Handwriting AI Studio &bull; 한글 &middot; 숫자 &middot; 영어 지원</p>
+        </div>
+      </div>
+
+      <!-- Mode Selector & Controls -->
+      <div class="header-controls">
+        <div class="mode-switch-group" role="tablist" aria-label="인식 모드 선택">
+          <button id="mode-digit" class="mode-tab-btn active" role="tab" aria-selected="true" data-mode="digit">
+            <i class="fa-solid fa-calculator"></i>
+            <span>숫자 전용 (0~9)</span>
+            <span class="badge-fast">초고속</span>
+          </button>
+          <button id="mode-korean" class="mode-tab-btn" role="tab" aria-selected="false" data-mode="korean">
+            <i class="fa-solid fa-language"></i>
+            <span>한글 &middot; 영문 범용</span>
+            <span class="badge-ocr">OCR</span>
+          </button>
+        </div>
+
+        <div class="header-actions">
+          <button id="theme-toggle-btn" class="icon-btn" title="다크/라이트 테마 변경" aria-label="테마 변경">
+            <i class="fa-solid fa-sun theme-sun-icon"></i>
+            <i class="fa-solid fa-moon theme-moon-icon"></i>
+          </button>
+          <button id="sound-toggle-btn" class="icon-btn active" title="효과음 켜기/끄기" aria-label="효과음">
+            <i class="fa-solid fa-volume-high sound-on-icon"></i>
+            <i class="fa-solid fa-volume-xmark sound-off-icon"></i>
+          </button>
+          <button id="help-btn" class="icon-btn" title="이용 가이드" aria-label="도움말">
+            <i class="fa-solid fa-circle-question"></i>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Studio Workspace -->
+    <main class="studio-grid">
+      <!-- Left Column: Drawing Canvas Studio -->
+      <section class="studio-card canvas-card">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-icon"><i class="fa-solid fa-paintbrush"></i></span>
+            <div>
+              <h2 class="card-title">스마트 도화지</h2>
+              <p class="card-desc">도화지 중앙에 마우스나 손가락으로 글씨를 써보세요</p>
+            </div>
+          </div>
+          <div class="canvas-status-badge" id="canvas-status">준비 완료</div>
+        </div>
+
+        <!-- Canvas Container -->
+        <div class="canvas-wrapper-outer">
+          <div class="canvas-wrapper" id="canvas-wrapper">
+            <canvas id="paint-canvas" width="480" height="480"></canvas>
+            <div class="grid-overlay active" id="grid-overlay">
+              <div class="grid-line grid-v"></div>
+              <div class="grid-line grid-h"></div>
+              <div class="grid-circle"></div>
+            </div>
+            <div class="canvas-watermark" id="canvas-watermark">
+              <i class="fa-solid fa-hand-pointer"></i>
+              <span>여기에 글씨를 쓰세요</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Canvas Toolbar -->
+        <div class="canvas-toolbar">
+          <!-- Tool Selection -->
+          <div class="tool-group">
+            <button id="tool-pen" class="tool-btn active" title="펜 도구">
+              <i class="fa-solid fa-pen"></i>
+              <span>펜</span>
+            </button>
+            <button id="tool-eraser" class="tool-btn" title="부분 지우개">
+              <i class="fa-solid fa-eraser"></i>
+              <span>지우개</span>
+            </button>
+          </div>
+
+          <div class="tool-divider"></div>
+
+          <!-- Brush Size Control -->
+          <div class="tool-group brush-size-control">
+            <label for="brush-size-slider" class="tool-label">
+              <i class="fa-solid fa-circle-notch"></i>
+              <span id="brush-size-text">굵기: 24px</span>
+            </label>
+            <input type="range" id="brush-size-slider" min="8" max="48" value="24" class="custom-slider">
+          </div>
+
+          <div class="tool-divider"></div>
+
+          <!-- Actions: Undo, Grid, Clear -->
+          <div class="tool-group">
+            <button id="btn-undo" class="tool-btn" title="실행 취소 (Ctrl+Z)">
+              <i class="fa-solid fa-rotate-left"></i>
+              <span>되돌리기</span>
+            </button>
+            <button id="btn-grid-toggle" class="tool-btn active" title="보조선 그리드 토글">
+              <i class="fa-solid fa-table-cells-large"></i>
+              <span>보조선</span>
+            </button>
+            <button id="btn-clear" class="tool-btn danger" title="도화지 전체 비우기">
+              <i class="fa-solid fa-trash-can"></i>
+              <span>전체 지우기</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Sample Presets Quick Bar -->
+        <div class="presets-bar">
+          <span class="preset-label"><i class="fa-solid fa-wand-magic-sparkles"></i> 예시 써보기:</span>
+          <div class="preset-chips" id="preset-chips">
+            <!-- Dynamically populated based on active mode -->
+          </div>
+        </div>
+
+        <!-- Main Action CTA Button -->
+        <div class="cta-action-area">
+          <button id="btn-recognize" class="btn-recognize-hero">
+            <div class="btn-shine"></div>
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            <span class="btn-text">글자 인식하기</span>
+            <span class="btn-subtext">AI 분석 시작 (Ctrl + Enter)</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Right Column: Recognition Center & Results -->
+      <section class="studio-card results-card">
+        <div class="card-header">
+          <div class="card-title-group">
+            <span class="card-icon"><i class="fa-solid fa-brain"></i></span>
+            <div>
+              <h2 class="card-title">AI 분석 결과</h2>
+              <p class="card-desc" id="engine-status-text">딥러닝 AI 모델이 글씨를 판독합니다</p>
+            </div>
+          </div>
+          <div class="mode-badge" id="current-mode-badge">숫자 고속 모드</div>
+        </div>
+
+        <!-- Hero Result Box -->
+        <div class="hero-result-container">
+          <div class="result-placeholder" id="result-placeholder">
+            <div class="pulse-icon">
+              <i class="fa-solid fa-arrow-pointer"></i>
+            </div>
+            <p class="placeholder-title">아직 인식된 글자가 없습니다</p>
+            <p class="placeholder-desc">왼쪽 도화지에 글씨를 쓴 뒤 <strong>[글자 인식하기]</strong> 버튼을 눌러보세요.</p>
+          </div>
+
+          <!-- Loading Animation View -->
+          <div class="result-loading" id="result-loading" style="display: none;">
+            <div class="spinner-ring">
+              <div></div><div></div><div></div><div></div>
+            </div>
+            <p class="loading-title" id="loading-title">AI가 글씨를 분석하는 중...</p>
+            <div class="loading-progress-bar">
+              <div class="progress-fill" id="loading-progress-fill"></div>
+            </div>
+            <p class="loading-detail" id="loading-detail">윤곽선 및 특징점 추출 중</p>
+          </div>
+
+          <!-- Final Recognition Output -->
+          <div class="result-content" id="result-content" style="display: none;">
+            <div class="primary-result-box">
+              <div class="result-character-wrap">
+                <span class="result-character" id="main-result-char">7</span>
+                <span class="confidence-badge" id="main-confidence-badge">99.4% 일치</span>
+              </div>
+              <div class="result-verdict">
+                <span class="verdict-label">AI 최종 판독</span>
+                <h3 class="verdict-text" id="main-result-desc">숫자 '7'</h3>
+              </div>
+            </div>
+
+            <!-- Quick Action Toolbar for Result -->
+            <div class="result-actions-bar">
+              <button id="btn-tts-speak" class="action-pill-btn" title="발음 듣기">
+                <i class="fa-solid fa-volume-high"></i>
+                <span>발음 듣기</span>
+              </button>
+              <button id="btn-copy-char" class="action-pill-btn" title="글자 복사">
+                <i class="fa-solid fa-copy"></i>
+                <span>복사</span>
+              </button>
+              <button id="btn-add-to-notepad" class="action-pill-btn highlight" title="문장 메모장에 추가">
+                <i class="fa-solid fa-plus"></i>
+                <span>메모장에 추가</span>
+              </button>
+              <button id="btn-save-image" class="action-pill-btn" title="손글씨 그림 저장">
+                <i class="fa-solid fa-download"></i>
+                <span>그림 저장</span>
+              </button>
+            </div>
+
+            <!-- Probability Distribution (Top Candidates) -->
+            <div class="candidates-container" id="candidates-container">
+              <div class="section-subheading">
+                <span><i class="fa-solid fa-chart-simple"></i> 후보 글자별 신뢰도</span>
+                <span class="subheading-sub">상위 3개 예측</span>
+              </div>
+              <div class="candidates-list" id="candidates-list">
+                <!-- Dynamically populated candidate bars -->
+              </div>
+            </div>
+
+            <!-- AI Vision Preprocessing Preview -->
+            <div class="ai-vision-box">
+              <div class="vision-info">
+                <span class="vision-title"><i class="fa-solid fa-eye"></i> AI 시선 엿보기</span>
+                <span class="vision-desc">중앙 정렬 및 노이즈 제거된 최적화 데이터</span>
+              </div>
+              <div class="vision-preview-wrapper">
+                <canvas id="preview-canvas" width="56" height="56"></canvas>
+                <div class="vision-tag">28x28 Net</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sentence Accumulator Notepad (문장 완성 메모장) -->
+        <div class="notepad-section">
+          <div class="notepad-header">
+            <div class="notepad-title">
+              <i class="fa-solid fa-book-open"></i>
+              <span>문장 완성 메모장</span>
+              <span class="notepad-char-count" id="notepad-char-count">0자</span>
+            </div>
+            <div class="notepad-actions">
+              <button id="btn-notepad-tts" class="mini-icon-btn" title="전체 문장 읽기">
+                <i class="fa-solid fa-volume-high"></i>
+              </button>
+              <button id="btn-notepad-copy" class="mini-icon-btn" title="전체 복사">
+                <i class="fa-solid fa-copy"></i>
+              </button>
+              <button id="btn-notepad-clear" class="mini-icon-btn danger" title="메모장 비우기">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            </div>
+          </div>
+          <div class="notepad-body">
+            <textarea id="notepad-textarea" placeholder="인식된 글자들이 여기에 차곡차곡 이어져 문장이 완성됩니다. 직접 타이핑하여 수정할 수도 있습니다." rows="2"></textarea>
+          </div>
+          <div class="notepad-quick-keys">
+            <button class="key-chip" id="btn-key-space">띄어쓰기(Space)</button>
+            <button class="key-chip" id="btn-key-backspace">지우기(⌫)</button>
+            <button class="key-chip" id="btn-key-enter">줄바꿈(Enter)</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Section: History Bar -->
+    <section class="history-section studio-card">
+      <div class="history-header">
+        <div class="history-title">
+          <i class="fa-solid fa-clock-rotate-left"></i>
+          <span>최근 인식 기록</span>
+          <span class="history-badge" id="history-count">0건</span>
+        </div>
+        <button id="btn-clear-history" class="text-btn">기록 삭제</button>
+      </div>
+      <div class="history-scroll-track" id="history-scroll-track">
+        <div class="history-empty" id="history-empty">
+          <span>인식 기록이 이곳에 저장됩니다.</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <p>Handwriting AI Studio &copy; 2026 &bull; 모던 딥러닝 손글씨 분석 시스템 &bull; 비전공자 친화형 웹 UI</p>
+    </footer>
+  </div>
+
+  <!-- Help & Guide Modal -->
+  <div class="modal-backdrop" id="help-modal" style="display: none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <i class="fa-solid fa-lightbulb"></i>
+          <span>손글씨 인식 스튜디오 이용 가이드</span>
+        </div>
+        <button id="modal-close-btn" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="guide-item">
+          <div class="guide-number">1</div>
+          <div class="guide-text">
+            <h4>모드 선택하기</h4>
+            <p><strong>숫자(0~9)</strong>를 쓸 때는 상단의 <strong>[숫자 전용]</strong> 모드를, <strong>한글 단어/글자/영어</strong>를 쓸 때는 <strong>[한글&middot;영문 범용]</strong> 모드를 선택하세요.</p>
+          </div>
+        </div>
+        <div class="guide-item">
+          <div class="guide-number">2</div>
+          <div class="guide-text">
+            <h4>글씨 쓰기 팁</h4>
+            <p>도화지 가운데 격자 보조선 안에 글씨를 큼직하고 또렷하게 쓰면 AI 인식률이 가장 높아집니다.</p>
+          </div>
+        </div>
+        <div class="guide-item">
+          <div class="guide-number">3</div>
+          <div class="guide-text">
+            <h4>편의 기능 활용하기</h4>
+            <p><strong>[발음 듣기]</strong>로 원어민 발음을 듣고, <strong>[메모장에 추가]</strong>를 눌러 글자를 이어 긴 문장(예: 대한민국)을 만들어 보세요!</p>
+          </div>
+        </div>
+        <div class="guide-item">
+          <div class="guide-number">⌨️</div>
+          <div class="guide-text">
+            <h4>단축키 안내</h4>
+            <p><code>Ctrl + Enter</code>: 인식 시작 | <code>Ctrl + Z</code>: 되돌리기 | <code>Alt + C</code>: 도화지 비우기</p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="modal-ok-btn" class="btn-primary-modal">확인했습니다</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Audio Effects (Web Audio API synthesis, no external audio files required) -->
+
+  <!-- JavaScript Modules -->
+  <script src="js/sound.js"></script>
+  <script src="js/tts.js"></script>
+  <script src="js/preprocess.js"></script>
+  <script src="js/mnist_model.js"></script>
+  <script src="js/ocr_engine.js"></script>
+  <script src="js/canvas.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
